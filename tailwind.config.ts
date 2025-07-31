@@ -277,6 +277,6 @@ const config = {
       addUtilities(newUtilities)
     }
   ],
-} satisfies Config;
+} satisfies config;
 
 export default config;
