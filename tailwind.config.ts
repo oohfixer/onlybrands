@@ -1,9 +1,13 @@
-const config = {
+/* eslint-disable ts/no-require-imports */
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
   darkMode: ['class'],
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
+        // OnlyBrands Brand Colors - Primary brand palette
         brand: {
           primary: '#00B8E6',
           'primary-hover': '#0099CC',
@@ -277,6 +281,6 @@ const config = {
       addUtilities(newUtilities)
     }
   ],
-} satisfies config;
+};
 
 export default config;
