@@ -1,633 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+@layer base {
+  :root {
+    /* OnlyBrands Light Theme (fallback) */
+    --background: 240 10% 3.9%; /* Dark background for light theme fallback */
+    --foreground: 0 0% 98%; /* White text */
 
-// Icons (using simple SVG instead of external library to match style guide)
-const HomeIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-  </svg>
-);
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
 
-const TrendingUpIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
-  </svg>
-);
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-const TargetIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-    <circle cx="12" cy="12" r="4"/>
-    <circle cx="12" cy="12" r="2"/>
-  </svg>
-);
+    /* OnlyBrands Primary = brand-primary #00B8E6 */
+    --primary: 195 100% 45%; /* #00B8E6 in HSL */
+    --primary-foreground: 0 0% 0%; /* Black text on primary */
 
-const UsersIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="m22 21-3-3m0 0a2 2 0 1 1-2.83-2.83 2 2 0 0 1 2.83 2.83z"/>
-  </svg>
-);
+    /* OnlyBrands Secondary = brand-secondary #0088D9 */
+    --secondary: 207 100% 43%; /* #0088D9 in HSL */
+    --secondary-foreground: 0 0% 98%;
 
-const PlusIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M12 2v20M2 12h20"/>
-  </svg>
-);
+    --muted: 0 0% 6.7%; /* bg-tertiary equivalent */
+    --muted-foreground: 0 0% 53.3%; /* text-tertiary equivalent */
 
-const SendIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
-    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-  </svg>
-);
+    --accent: 0 0% 10%; /* bg-quaternary equivalent */
+    --accent-foreground: 0 0% 98%;
 
-// Type Definitions
-interface DashboardStats {
-  totalCampaigns: number;
-  activeBids: number;
-  successRate: number;
-  totalEarnings: number;
-}
+    --destructive: 0 84.2% 60.2%; /* Keep existing red */
+    --destructive-foreground: 0 0% 98%;
 
-interface Campaign {
-  id: string;
-  brandName: string;
-  brandInitials: string;
-  title: string;
-  category: string;
-  description: string;
-  bidCount: number;
-  timeRemaining: string;
-  isEligible: boolean;
-  requirements: Array<{
-    label: string;
-    status: 'good' | 'need';
-  }>;
-}
+    --border: 0 0% 20%; /* border-custom-primary equivalent */
+    --input: 0 0% 26.7%; /* border-custom-secondary equivalent */
+    --ring: 195 100% 45%; /* Same as primary */
 
-interface Activity {
-  id: string;
-  type: 'bid_submitted' | 'bid_accepted' | 'campaign_completed' | 'payment_received';
-  description: string;
-  time: string;
-  amount?: number;
-}
-
-// Utility Components
-const StatusPill: React.FC<{ status: 'good' | 'need'; text?: string }> = ({ status, text }) => {
-  const statusStyles = {
-    good: 'bg-green-500 text-white',
-    need: 'bg-red-500 text-white'
-  };
-
-  const displayText = text || (status === 'good' ? 'Good' : 'Need');
-
-  return (
-    <span className={`
-      ${statusStyles[status]}
-      font-semibold text-xs px-2.5 py-1
-      rounded-xl min-w-[50px] text-center
-      inline-block
-    `}>
-      {displayText}
-    </span>
-  );
-};
-
-const BrandAvatar: React.FC<{ initials: string; size?: 'sm' | 'md' | 'lg' }> = ({ 
-  initials, 
-  size = 'md' 
-}) => {
-  const sizeClasses = {
-    sm: 'w-10 h-10 text-sm',
-    md: 'w-14 h-14 text-lg',
-    lg: 'w-16 h-16 text-xl'
-  };
-
-  return (
-    <div className={`
-      ${sizeClasses[size]}
-      rounded-full 
-      bg-gradient-to-br from-[#00B8E6] to-[#0ea5e9]
-      flex items-center justify-center 
-      text-white font-bold 
-      tracking-tight
-    `}>
-      {initials}
-    </div>
-  );
-};
-
-// Navigation Component
-const DashboardNav: React.FC<{ activeTab: string; onTabChange: (tab: string) => void; userRole: string }> = ({ 
-  activeTab, 
-  onTabChange, 
-  userRole 
-}) => {
-  const brandNavItems = [
-    { id: 'overview', icon: HomeIcon, title: 'Overview', subtitle: 'Dashboard home' },
-    { id: 'campaigns', icon: TrendingUpIcon, title: 'Campaigns', subtitle: 'Manage projects' },
-    { id: 'bids', icon: TargetIcon, title: 'Bids', subtitle: 'Review proposals' },
-    { id: 'analytics', icon: TrendingUpIcon, title: 'Analytics', subtitle: 'Performance data' }
-  ];
-
-  const influencerNavItems = [
-    { id: 'overview', icon: HomeIcon, title: 'Overview', subtitle: 'Dashboard home' },
-    { id: 'marketplace', icon: TrendingUpIcon, title: 'Marketplace', subtitle: 'Find campaigns' },
-    { id: 'my-bids', icon: TargetIcon, title: 'My Bids', subtitle: 'Track proposals' },
-    { id: 'earnings', icon: TrendingUpIcon, title: 'Earnings', subtitle: 'Revenue tracking' }
-  ];
-
-  const navItems = userRole === 'brand' ? brandNavItems : influencerNavItems;
-
-  return (
-    <div className="flex gap-6 justify-center mb-12 flex-wrap">
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = activeTab === item.id;
-
-        return (
-          <div
-            key={item.id}
-            onClick={() => onTabChange(item.id)}
-            className={`
-              bg-[#1a1a1a] px-8 py-6 rounded-2xl
-              text-center cursor-pointer min-w-[140px]
-              transition-all duration-400 ease-out
-              border border-white/5
-              shadow-[8px_8px_16px_rgba(0,0,0,0.4),-8px_-8px_16px_rgba(255,255,255,0.02)]
-              hover:shadow-[12px_12px_24px_rgba(0,0,0,0.6),-12px_-12px_24px_rgba(255,255,255,0.03)]
-              hover:-translate-y-0.5
-              ${isActive ? 'ring-2 ring-[#00B8E6]/30' : ''}
-            `}
-          >
-            <div className="w-6 h-6 mx-auto mb-2 text-[#00B8E6]">
-              <Icon />
-            </div>
-            <div className="text-white font-medium text-sm mb-1">
-              {item.title}
-            </div>
-            <div className="text-gray-400 text-xs">
-              {item.subtitle}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-// Stats Card Component
-const StatsCard: React.FC<{ 
-  title: string; 
-  value: string | number; 
-  icon: React.ComponentType; 
-  trend?: string;
-  trendUp?: boolean;
-}> = ({ title, value, icon: Icon, trend, trendUp }) => {
-  return (
-    <div className="
-      bg-[#1a1a1a] rounded-3xl p-8
-      shadow-[10px_10px_20px_rgba(0,0,0,0.4),-10px_-10px_20px_rgba(255,255,255,0.02)]
-      border border-white/5
-      transition-all duration-400 ease-out
-      hover:shadow-[12px_12px_24px_rgba(0,0,0,0.6),-12px_-12px_24px_rgba(255,255,255,0.03)]
-      hover:-translate-y-1
-    ">
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-12 h-12 text-[#00B8E6]">
-          <Icon />
-        </div>
-        {trend && (
-          <div className={`text-sm font-medium ${trendUp ? 'text-green-400' : 'text-red-400'}`}>
-            {trend}
-          </div>
-        )}
-      </div>
-      <div className="text-3xl font-bold text-white mb-2">
-        {value}
-      </div>
-      <div className="text-gray-400 text-sm font-normal">
-        {title}
-      </div>
-    </div>
-  );
-};
-
-// Campaign Card Component
-const CampaignCard: React.FC<{ 
-  campaign: Campaign; 
-  onAction: (id: string, action: string) => void;
-  actionLabel: string;
-}> = ({ campaign, onAction, actionLabel }) => {
-  return (
-    <div className="
-      bg-[#1a1a1a] rounded-3xl p-8 
-      h-[420px] flex flex-col
-      shadow-[10px_10px_20px_rgba(0,0,0,0.4),-10px_-10px_20px_rgba(255,255,255,0.02)]
-      border border-white/5
-      transition-all duration-400 ease-out
-      hover:shadow-[12px_12px_24px_rgba(0,0,0,0.6),-12px_-12px_24px_rgba(255,255,255,0.03)]
-      hover:-translate-y-1
-    ">
-      {/* Header */}
-      <div className="flex items-center mb-6">
-        <BrandAvatar initials={campaign.brandInitials} />
-        <div className="flex-1 ml-4">
-          <h3 className="text-xl font-semibold mb-1 tracking-tight text-white">
-            {campaign.title}
-          </h3>
-          <p className="text-gray-400 text-sm font-normal">
-            {campaign.category}
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="text-[#00B8E6] font-semibold text-sm">
-            {campaign.bidCount} bids
-          </div>
-          <div className="text-gray-400 text-xs">
-            {campaign.timeRemaining}
-          </div>
-        </div>
-      </div>
-      
-      {/* Description */}
-      <div 
-        className="
-          text-gray-300 leading-relaxed mb-6 
-          font-normal text-sm flex-1
-          overflow-hidden
-        "
-        style={{
-          display: '-webkit-box',
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical' as const,
-        }}
-      >
-        {campaign.description}
-      </div>
-      
-      {/* Requirements */}
-      <div className="mb-6">
-        {campaign.requirements.map((req, index) => (
-          <div key={index} className="flex justify-between items-center mb-1.5 text-sm">
-            <span className="text-gray-300 font-normal">
-              {req.label}
-            </span>
-            <StatusPill status={req.status} />
-          </div>
-        ))}
-      </div>
-      
-      {/* Action Button */}
-      <button
-        onClick={() => onAction(campaign.id, 'primary')}
-        className={`
-          w-full font-semibold text-base
-          px-8 py-4 rounded-2xl
-          flex items-center justify-center gap-2.5
-          transition-all duration-400 ease-out
-          mt-auto
-          ${campaign.isEligible ? `
-            bg-[#1a1a1a] text-[#00B8E6]
-            shadow-[6px_6px_12px_rgba(0,0,0,0.4),-6px_-6px_12px_rgba(255,255,255,0.02)]
-            hover:bg-gradient-to-br hover:from-[#00B8E6] hover:to-[#0ea5e9]
-            hover:text-white hover:-translate-y-0.5
-            hover:shadow-[8px_8px_16px_rgba(0,0,0,0.4),-8px_-8px_16px_rgba(255,255,255,0.02)]
-            active:translate-y-0 cursor-pointer
-          ` : `
-            bg-[#1a1a1a] text-gray-500 opacity-50 cursor-not-allowed
-            shadow-[6px_6px_12px_rgba(0,0,0,0.4),-6px_-6px_12px_rgba(255,255,255,0.02)]
-          `}
-        `}
-        disabled={!campaign.isEligible}
-      >
-        <SendIcon />
-        {actionLabel}
-      </button>
-    </div>
-  );
-};
-
-// Activity Feed Component
-const ActivityFeed: React.FC<{ activities: Activity[] }> = ({ activities }) => {
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'bid_submitted':
-        return <SendIcon />;
-      case 'bid_accepted':
-        return <TargetIcon />;
-      case 'campaign_completed':
-        return <HomeIcon />;
-      case 'payment_received':
-        return <TrendingUpIcon />;
-      default:
-        return <HomeIcon />;
-    }
-  };
-
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'bid_submitted':
-        return 'text-blue-400';
-      case 'bid_accepted':
-        return 'text-green-400';
-      case 'campaign_completed':
-        return 'text-purple-400';
-      case 'payment_received':
-        return 'text-yellow-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
-
-  return (
-    <div className="
-      bg-[#1a1a1a] rounded-3xl p-8
-      shadow-[10px_10px_20px_rgba(0,0,0,0.4),-10px_-10px_20px_rgba(255,255,255,0.02)]
-      border border-white/5
-    ">
-      <h3 className="text-xl font-semibold text-white mb-6">Recent Activity</h3>
-      <div className="space-y-4">
-        {activities.map((activity) => (
-          <div key={activity.id} className="flex items-start gap-4">
-            <div className={`w-8 h-8 ${getActivityColor(activity.type)} flex-shrink-0 mt-1`}>
-              {getActivityIcon(activity.type)}
-            </div>
-            <div className="flex-1">
-              <p className="text-gray-300 text-sm leading-relaxed">
-                {activity.description}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-gray-500 text-xs">
-                  {activity.time}
-                </span>
-                {activity.amount && (
-                  <span className="text-green-400 text-xs font-medium">
-                    ${activity.amount.toLocaleString()}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Quick Actions Component
-const QuickActions: React.FC<{ userRole: string; onAction: (action: string) => void }> = ({ userRole, onAction }) => {
-  const brandActions = [
-    { id: 'create-campaign', icon: PlusIcon, title: 'Create Campaign', subtitle: 'Start new project' },
-    { id: 'review-bids', icon: TargetIcon, title: 'Review Bids', subtitle: 'Check proposals' },
-    { id: 'view-analytics', icon: TrendingUpIcon, title: 'View Analytics', subtitle: 'Performance data' }
-  ];
-
-  const influencerActions = [
-    { id: 'browse-campaigns', icon: TrendingUpIcon, title: 'Browse Campaigns', subtitle: 'Find opportunities' },
-    { id: 'check-bids', icon: TargetIcon, title: 'Check My Bids', subtitle: 'Track proposals' },
-    { id: 'update-portfolio', icon: UsersIcon, title: 'Update Portfolio', subtitle: 'Showcase work' }
-  ];
-
-  const actions = userRole === 'brand' ? brandActions : influencerActions;
-
-  return (
-    <div className="
-      bg-[#1a1a1a] rounded-3xl p-8
-      shadow-[10px_10px_20px_rgba(0,0,0,0.4),-10px_-10px_20px_rgba(255,255,255,0.02)]
-      border border-white/5
-    ">
-      <h3 className="text-xl font-semibold text-white mb-6">Quick Actions</h3>
-      <div className="space-y-4">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <button
-              key={action.id}
-              onClick={() => onAction(action.id)}
-              className="
-                w-full bg-[#1a1a1a] px-6 py-4 rounded-2xl
-                text-left cursor-pointer
-                transition-all duration-400 ease-out
-                border border-white/5
-                shadow-[6px_6px_12px_rgba(0,0,0,0.4),-6px_-6px_12px_rgba(255,255,255,0.02)]
-                hover:shadow-[8px_8px_16px_rgba(0,0,0,0.4),-8px_-8px_16px_rgba(255,255,255,0.02)]
-                hover:-translate-y-0.5
-                flex items-center gap-4
-              "
-            >
-              <div className="w-8 h-8 text-[#00B8E6]">
-                <Icon />
-              </div>
-              <div>
-                <div className="text-white font-medium text-sm">
-                  {action.title}
-                </div>
-                <div className="text-gray-400 text-xs">
-                  {action.subtitle}
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// Main Dashboard Component
-const OnlyBrandsDashboard: React.FC = () => {
-  const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(true);
-
-  // Mock data - replace with real API calls
-  const userRole = 'influencer'; // This would come from session
-  
-  const mockStats: DashboardStats = {
-    totalCampaigns: userRole === 'brand' ? 12 : 0,
-    activeBids: userRole === 'brand' ? 28 : 5,
-    successRate: userRole === 'brand' ? 73 : 68,
-    totalEarnings: userRole === 'brand' ? 45000 : 12500
-  };
-
-  const mockCampaigns: Campaign[] = [
-    {
-      id: '1',
-      brandName: 'Nike',
-      brandInitials: 'NK',
-      title: 'Nike Boost Campaign',
-      category: 'Fitness & Lifestyle',
-      description: 'Looking for authentic fitness influencers to showcase our latest running shoe technology. Create engaging Instagram content that resonates with your audience and demonstrates real performance benefits.',
-      bidCount: 12,
-      timeRemaining: '3 days left',
-      isEligible: false,
-      requirements: [
-        { label: '10K+', status: 'good' },
-        { label: 'Instagram', status: 'good' },
-        { label: 'Fitness', status: 'need' }
-      ]
-    },
-    {
-      id: '2',
-      brandName: 'Apple',
-      brandInitials: 'AP',
-      title: 'iPhone Review Series',
-      category: 'Technology',
-      description: 'Seeking tech reviewers for comprehensive iPhone coverage. Looking for detailed unboxing, feature demonstrations, and real-world usage scenarios.',
-      bidCount: 8,
-      timeRemaining: '5 days left',
-      isEligible: true,
-      requirements: [
-        { label: '25K+', status: 'good' },
-        { label: 'YouTube', status: 'good' },
-        { label: 'Tech', status: 'good' }
-      ]
-    }
-  ];
-
-  const mockActivities: Activity[] = [
-    {
-      id: '1',
-      type: 'bid_submitted',
-      description: 'You submitted a bid for "Summer Fashion Campaign" by Brand Co.',
-      time: '2 hours ago'
-    },
-    {
-      id: '2',
-      type: 'bid_accepted',
-      description: 'Your bid for "Tech Review Series" was accepted!',
-      time: '1 day ago',
-      amount: 2500
-    },
-    {
-      id: '3',
-      type: 'payment_received',
-      description: 'Payment received for completed "Lifestyle Brand Campaign"',
-      time: '3 days ago',
-      amount: 1800
-    }
-  ];
-
-  useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000);
-  }, []);
-
-  const handleCampaignAction = (id: string, action: string) => {
-    console.log(`Campaign action: ${action} for campaign ${id}`);
-    // Handle campaign actions (bid, view details, etc.)
-  };
-
-  const handleQuickAction = (action: string) => {
-    console.log(`Quick action: ${action}`);
-    // Handle quick actions (navigate to pages, open modals, etc.)
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <div className="text-[#00B8E6] text-xl font-medium">Loading dashboard...</div>
-      </div>
-    );
+    --radius: 0.5rem;
   }
 
-  const statsConfig = userRole === 'brand' ? [
-    { title: 'Active Campaigns', value: mockStats.totalCampaigns, icon: HomeIcon, trend: '+2', trendUp: true },
-    { title: 'Total Bids Received', value: mockStats.activeBids, icon: TargetIcon, trend: '+12', trendUp: true },
-    { title: 'Success Rate', value: `${mockStats.successRate}%`, icon: TrendingUpIcon, trend: '+5%', trendUp: true },
-    { title: 'Total Investment', value: `$${mockStats.totalEarnings.toLocaleString()}`, icon: TrendingUpIcon, trend: '+$2.1K', trendUp: true }
-  ] : [
-    { title: 'Active Bids', value: mockStats.activeBids, icon: TargetIcon, trend: '+2', trendUp: true },
-    { title: 'Success Rate', value: `${mockStats.successRate}%`, icon: TrendingUpIcon, trend: '+3%', trendUp: true },
-    { title: 'Total Earnings', value: `$${mockStats.totalEarnings.toLocaleString()}`, icon: TrendingUpIcon, trend: '+$800', trendUp: true },
-    { title: 'Campaigns Won', value: 8, icon: HomeIcon, trend: '+1', trendUp: true }
-  ];
+  .dark {
+    /* OnlyBrands Dark Theme (primary theme) */
+    --background: 0 0% 0%; /* bg-primary: #000000 */
+    --foreground: 0 0% 100%; /* text-primary: #ffffff */
 
-  return (
-    <div className="min-h-screen bg-[#1a1a1a]" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
-            Welcome back, <span className="text-[#00B8E6]">{userRole === 'brand' ? 'Brand Manager' : 'Creator'}</span>
-          </h1>
-          <p className="text-gray-400 text-lg font-normal">
-            {userRole === 'brand' 
-              ? 'Manage your campaigns and review incoming proposals' 
-              : 'Discover new opportunities and track your bids'
-            }
-          </p>
-        </div>
+    --card: 0 0% 4%; /* bg-secondary: #0a0a0a */
+    --card-foreground: 0 0% 100%;
 
-        {/* Navigation */}
-        <DashboardNav 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
-          userRole={userRole}
-        />
+    --popover: 0 0% 6.7%; /* bg-tertiary: #111111 */
+    --popover-foreground: 0 0% 100%;
 
-        {activeTab === 'overview' && (
-          <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              {statsConfig.map((stat, index) => (
-                <StatsCard
-                  key={index}
-                  title={stat.title}
-                  value={stat.value}
-                  icon={stat.icon}
-                  trend={stat.trend}
-                  trendUp={stat.trendUp}
-                />
-              ))}
-            </div>
+    /* OnlyBrands Primary = brand-primary #00B8E6 */
+    --primary: 195 100% 45%; /* #00B8E6 */
+    --primary-foreground: 0 0% 0%; /* Black text on primary */
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Campaigns/Opportunities Column */}
-              <div className="lg:col-span-2">
-                <h2 className="text-2xl font-semibold text-white mb-6">
-                  {userRole === 'brand' ? 'Recent Campaigns' : 'Available Opportunities'}
-                </h2>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {mockCampaigns.map((campaign) => (
-                    <CampaignCard
-                      key={campaign.id}
-                      campaign={campaign}
-                      onAction={handleCampaignAction}
-                      actionLabel={userRole === 'brand' ? 'View Bids' : 'Submit Bid'}
-                    />
-                  ))}
-                </div>
-              </div>
+    /* OnlyBrands Secondary uses bg-tertiary for secondary elements */
+    --secondary: 0 0% 6.7%; /* bg-tertiary: #111111 */
+    --secondary-foreground: 0 0% 100%;
 
-              {/* Sidebar */}
-              <div className="space-y-8">
-                <QuickActions userRole={userRole} onAction={handleQuickAction} />
-                <ActivityFeed activities={mockActivities} />
-              </div>
-            </div>
-          </>
-        )}
+    --muted: 0 0% 10%; /* bg-quaternary: #1a1a1a */
+    --muted-foreground: 0 0% 53.3%; /* text-tertiary: #888888 */
 
-        {activeTab !== 'overview' && (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🚀</div>
-            <h2 className="text-2xl font-semibold text-white mb-4">
-              {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Coming Soon
-            </h2>
-            <p className="text-gray-400">
-              This section is under development. Switch to Overview to see the current dashboard.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+    --accent: 0 0% 13.3%; /* bg-hover: #222222 */
+    --accent-foreground: 0 0% 100%;
 
-export default OnlyBrandsDashboard;
+    --destructive: 0 84.2% 60.2%; /* Keep existing red */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%; /* border-custom-primary: #333333 */
+    --input: 0 0% 26.7%; /* border-custom-secondary: #444444 */
+    --ring: 195 100% 45%; /* brand-primary for focus */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-primary;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* OnlyBrands custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-bg-secondary;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-custom-secondary rounded;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border-custom-tertiary;
+  }
+}
+
+/* OnlyBrands utility classes */
+@layer utilities {
+  .text-gradient-primary {
+    @apply bg-gradient-primary bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-secondary {
+    @apply bg-gradient-secondary bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-accent {
+    @apply bg-gradient-accent bg-clip-text text-transparent;
+  }
+}
